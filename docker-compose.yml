@@ -1,0 +1,26 @@
+version: '3.7'
+
+services:
+  pulseaudio:
+    image: kdockerfiles/pulseaudio
+    volumes:
+      - tmp-pulse:/tmp/pulse
+      - etc-pulse:/usr/local/etc/pulse
+    command: -L "module-null-sink sink_name=Pad"
+    restart: always
+  pad:
+    image: antoniomika/pad:main
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN:-heres_a_token}
+      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID:-heres_a_client_id}
+      - DISCORD_BOT_OWNER_TAG=${DISCORD_BOT_OWNER_TAG:-heres_a_user_tag}
+      - FFMPEG_INPUT=${FFMPEG_INPUT:--f alsa -i default}
+    volumes:
+      - tmp-pulse:/tmp/pulse
+      - etc-pulse:/etc/pulse
+    restart: always
+    depends_on:
+      - pulseaudio
+volumes:
+  tmp-pulse:
+  etc-pulse:

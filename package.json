@@ -1,0 +1,38 @@
+{
+  "name": "pad",
+  "version": "1.0.0",
+  "description": "A pulse audio client for discord",
+  "main": "dist/src/lib.js",
+  "types": "dist/src/lib.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "start": "node ./dist/bin/padbot.js",
+    "dev": "npm run build && npm run start",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx --ignore-pattern dist/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/antoniomika/pad.git"
+  },
+  "author": "Antonio Mika <me@antoniomika.me>",
+  "bugs": {
+    "url": "https://github.com/antoniomika/pad/issues"
+  },
+  "homepage": "https://github.com/antoniomika/pad#readme",
+  "devDependencies": {
+    "@types/node": "^14.14.37",
+    "@typescript-eslint/eslint-plugin": "^4.21.0",
+    "eslint": "^7.23.0",
+    "eslint-config-standard-with-typescript": "^20.0.0",
+    "eslint-plugin-import": "^2.22.1",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-promise": "^4.3.1",
+    "typescript": "^4.2.4"
+  },
+  "dependencies": {
+    "@discordjs/opus": "^0.5.0",
+    "discord.js": "^12.5.3",
+    "prism-media": "^1.2.9"
+  }
+}
