@@ -138,7 +138,8 @@ class PADBot {
         title: 'Groups:',
         fields: [
           { name: 'Group', value: Object.keys(groups).join('\n'), inline: true },
-          { name: 'Members', value: Object.values(groups).join('\n'), inline: true }
+          // @ts-expect-error;
+          { name: 'Members', value: Object.values(groups).map(g => g.join(', ')).join('\n'), inline: true }
         ]
       }
     })
@@ -155,7 +156,7 @@ class PADBot {
       return await message.channel.send(`Added ${user} to ${group}`)
     }
 
-    return await message.channel.send('/adduser <user> <group>')
+    return await message.channel.send('!adduser <user> <group>')
   }
 
   async handleRemoveUser(message: Message): Promise<Message> {
@@ -169,7 +170,7 @@ class PADBot {
       return await message.channel.send(`Removed ${user} from ${group}`)
     }
 
-    return await message.channel.send('/removeuser <user> <group>')
+    return await message.channel.send('!removeuser <user> <group>')
   }
 
   async handleHelp(message: Message): Promise<Message> {
