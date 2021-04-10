@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PADBot = void 0;
 const discord_js_1 = require("discord.js");
+const fs_1 = require("fs");
 const prism_media_1 = __importDefault(require("prism-media"));
 class PADBot {
     constructor(discordToken, discordClientID, discordBotOwnerTag, ffmpegInput, registerExit = true) {
@@ -27,34 +28,101 @@ class PADBot {
             this.handleCommand(message).catch(console.error);
         });
         this.handlers = new Map([
-            ['!join', this.handleJoin.bind(this)],
-            ['!leave', this.handleLeave.bind(this)],
-            ['!volume', this.handleVolume.bind(this)],
-            ['!joinurl', this.handleJoinURL.bind(this)],
-            ['!help', this.handleHelp.bind(this)]
+            ['!join', { executor: this.handleJoin.bind(this), help: 'Joins the channel of the calling user', permittedGroups: ['admin'] }],
+            ['!leave', { executor: this.handleLeave.bind(this), help: 'Leaves the voice channel', permittedGroups: ['any'] }],
+            ['!volume', { executor: this.handleVolume.bind(this), help: '!volume <-10|10|10%|+10%|0.1|> - Changes the volume of the bot', permittedGroups: ['any'] }],
+            ['!joinurl', { executor: this.handleJoinURL.bind(this), help: 'Returns the discord bot join url', permittedGroups: ['admin'] }],
+            ['!help', { executor: this.handleHelp.bind(this), help: 'Prints help information', permittedGroups: ['any'] }]
         ]);
         if (this.registerExit) {
             this.registerExitHandler();
         }
+        this.state = {};
+        this.loadState();
+        if (Object.keys(this.state).length === 0) {
+            this.state = {
+                groups: {
+                    admin: []
+                }
+            };
+        }
+        if (this.state.groups.admin.length === 0) {
+            this.state.groups.admin.push(this.discordBotOwnerTag);
+        }
+    }
+    addUser(user, group) {
+        if (!(group in this.state.groups)) {
+            this.state.groups[group] = [];
+        }
+        this.state.groups[group].push(user);
+    }
+    removeUser(user, group) {
+        if (group in this.state.groups) {
+            const loc = this.state.groups[group].indexOf(user);
+            if (loc > -1) {
+                this.state.groups[group].splice(loc, 1);
+            }
+        }
+    }
+    loadState() {
+        try {
+            this.state = JSON.parse(fs_1.readFileSync('.pad.state').toString());
+        }
+        catch (err) {
+            console.error(err);
+        }
+    }
+    saveState() {
+        try {
+            fs_1.writeFileSync('.pad.state', JSON.stringify(this.state));
+        }
+        catch (err) {
+            console.error(err);
+        }
+    }
+    getState() {
+        return this.state;
+    }
+    setState(newState) {
+        this.state = newState;
     }
     addCommand(command, handler) {
-        this.handlers.set(command, handler.bind(this));
+        handler.executor.bind(this);
+        this.handlers.set(command, handler);
     }
     removeCommand(command) {
         this.handlers.delete(command);
     }
     async handleHelp(message) {
-        const helpMessageLines = ['Available commands to use:'];
-        for (const command in this.handlers) {
-            helpMessageLines.push(command);
-        }
-        return await message.channel.send(helpMessageLines.join('\n'));
+        return await message.channel.send({
+            embed: {
+                color: 3447003,
+                title: 'Available commands:',
+                fields: [
+                    { name: 'Command', value: Array.from(this.handlers.keys()).join('\n'), inline: true },
+                    { name: 'Help', value: Array.from(this.handlers.values()).map((h) => h.help).join('\n'), inline: true },
+                    { name: 'Permitted Groups', value: Array.from(this.handlers.values()).map((h) => h.permittedGroups.join(', ')).join('\n'), inline: true }
+                ]
+            }
+        });
     }
     async handleCommand(message) {
         const commandRoot = message.content.split(' ')[0];
         const handler = this.handlers.get(commandRoot);
         if (handler !== undefined) {
-            return await handler(message);
+            if (handler.permittedGroups.includes('any')) {
+                return await handler.executor(message);
+            }
+            if (message.member !== null) {
+                const groups = this.getState().groups;
+                for (const group in groups) {
+                    for (const member of groups[group]) {
+                        if (member === message.member.user.tag && handler.permittedGroups.includes(group)) {
+                            return await handler.executor(message);
+                        }
+                    }
+                }
+            }
         }
     }
     async handleJoin(message) {
@@ -157,6 +225,7 @@ class PADBot {
             conn.channel.leave();
         });
         this.client.destroy();
+        this.saveState();
         process.exit();
     }
 }

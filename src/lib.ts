@@ -1,7 +1,14 @@
 import { Client, Intents, Message } from 'discord.js'
+import { writeFileSync, readFileSync } from 'fs'
 import prism from 'prism-media'
 
-type Handler = (message: Message) => Promise<Message | undefined>
+type Executor = (message: Message) => Promise<Message | undefined>
+
+interface Handler {
+  executor: Executor
+  help: string
+  permittedGroups: string[]
+}
 
 class PADBot {
   discordToken: string
@@ -14,6 +21,8 @@ class PADBot {
   client: Client
 
   handlers: Map<string, Handler>
+
+  state: any
 
   constructor(discordToken: string, discordClientID: string, discordBotOwnerTag: string, ffmpegInput: string, registerExit: boolean = true) {
     this.discordToken = discordToken
@@ -40,20 +49,77 @@ class PADBot {
     })
 
     this.handlers = new Map([
-      ['!join', this.handleJoin.bind(this)],
-      ['!leave', this.handleLeave.bind(this)],
-      ['!volume', this.handleVolume.bind(this)],
-      ['!joinurl', this.handleJoinURL.bind(this)],
-      ['!help', this.handleHelp.bind(this)]
+      ['!join', { executor: this.handleJoin.bind(this), help: 'Joins the channel of the calling user', permittedGroups: ['admin'] }],
+      ['!leave', { executor: this.handleLeave.bind(this), help: 'Leaves the voice channel', permittedGroups: ['any'] }],
+      ['!volume', { executor: this.handleVolume.bind(this), help: '!volume <-10|10|10%|+10%|0.1|> - Changes the volume of the bot', permittedGroups: ['any'] }],
+      ['!joinurl', { executor: this.handleJoinURL.bind(this), help: 'Returns the discord bot join url', permittedGroups: ['admin'] }],
+      ['!help', { executor: this.handleHelp.bind(this), help: 'Prints help information', permittedGroups: ['any'] }]
     ])
 
     if (this.registerExit) {
       this.registerExitHandler()
     }
+
+    this.state = {}
+    this.loadState()
+
+    if (Object.keys(this.state).length === 0) {
+      this.state = {
+        groups: {
+          admin: []
+        }
+      }
+    }
+
+    if (this.state.groups.admin.length === 0) {
+      this.state.groups.admin.push(this.discordBotOwnerTag)
+    }
+  }
+
+  addUser(user: string, group: string): void {
+    if (!(group in this.state.groups)) {
+      this.state.groups[group] = []
+    }
+
+    this.state.groups[group].push(user)
+  }
+
+  removeUser(user: string, group: string): void {
+    if (group in this.state.groups) {
+      const loc = this.state.groups[group].indexOf(user)
+      if (loc > -1) {
+        this.state.groups[group].splice(loc, 1)
+      }
+    }
+  }
+
+  loadState(): void {
+    try {
+      this.state = JSON.parse(readFileSync('.pad.state').toString())
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  saveState(): void {
+    try {
+      writeFileSync('.pad.state', JSON.stringify(this.state))
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  getState(): any {
+    return this.state
+  }
+
+  setState(newState: {}): void {
+    this.state = newState
   }
 
   addCommand(command: string, handler: Handler): void {
-    this.handlers.set(command, handler.bind(this))
+    handler.executor.bind(this)
+    this.handlers.set(command, handler)
   }
 
   removeCommand(command: string): void {
@@ -61,13 +127,17 @@ class PADBot {
   }
 
   async handleHelp(message: Message): Promise<Message> {
-    const helpMessageLines = ['Available commands to use:']
-
-    for (const command in this.handlers) {
-      helpMessageLines.push(command)
-    }
-
-    return await message.channel.send(helpMessageLines.join('\n'))
+    return await message.channel.send({
+      embed: {
+        color: 3447003,
+        title: 'Available commands:',
+        fields: [
+          { name: 'Command', value: Array.from(this.handlers.keys()).join('\n'), inline: true },
+          { name: 'Help', value: Array.from(this.handlers.values()).map((h) => h.help).join('\n'), inline: true },
+          { name: 'Permitted Groups', value: Array.from(this.handlers.values()).map((h) => h.permittedGroups.join(', ')).join('\n'), inline: true }
+        ]
+      }
+    })
   }
 
   async handleCommand(message: Message): Promise<Message | undefined> {
@@ -75,7 +145,20 @@ class PADBot {
 
     const handler = this.handlers.get(commandRoot)
     if (handler !== undefined) {
-      return await handler(message)
+      if (handler.permittedGroups.includes('any')) {
+        return await handler.executor(message)
+      }
+
+      if (message.member !== null) {
+        const groups = this.getState().groups
+        for (const group in groups) {
+          for (const member of groups[group]) {
+            if (member === message.member.user.tag && handler.permittedGroups.includes(group)) {
+              return await handler.executor(message)
+            }
+          }
+        }
+      }
     }
   }
 
@@ -201,6 +284,7 @@ class PADBot {
     })
 
     this.client.destroy()
+    this.saveState()
     process.exit()
   }
 }
