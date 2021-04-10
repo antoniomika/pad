@@ -225,8 +225,9 @@ class PADBot {
     const ffmpegRecord = new prism.FFmpeg({
       args: this.ffmpegInput.split(' ').concat(['-analyzeduration', '0', '-loglevel', '0', '-f', 's16le', '-ar', '48000', '-ac', '2'])
     })
+
     // @ts-expect-error;
-    const dispatcher = connection.player.playPCMStream(ffmpegRecord, { type: 'converted' }, { ffmpeg: ffmpegRecord })
+    connection.player.playPCMStream(ffmpegRecord, { type: 'converted' }, { ffmpeg: ffmpegRecord })
 
     return await message.channel.send('Joined channel.')
   }
