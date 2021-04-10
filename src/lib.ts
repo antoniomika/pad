@@ -218,10 +218,6 @@ class PADBot {
       return await message.channel.send('You need to join a voice channel first!')
     }
 
-    if (this.discordBotOwnerTag !== 'ANYONE' && message.member?.user.tag !== this.discordBotOwnerTag) {
-      return await message.channel.send('The bot owner is only allowed to join the bot.')
-    }
-
     const connection = await message.member.voice.channel.join()
 
     await connection.voice?.setSelfDeaf(true)
@@ -231,8 +227,6 @@ class PADBot {
     })
     // @ts-expect-error;
     const dispatcher = connection.player.playPCMStream(ffmpegRecord, { type: 'converted' }, { ffmpeg: ffmpegRecord })
-
-    dispatcher.on('debug', console.log)
 
     return await message.channel.send('Joined channel.')
   }

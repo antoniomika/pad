@@ -169,9 +169,6 @@ class PADBot {
         if (message.member == null || (message.member.voice.channel == null)) {
             return await message.channel.send('You need to join a voice channel first!');
         }
-        if (this.discordBotOwnerTag !== 'ANYONE' && message.member?.user.tag !== this.discordBotOwnerTag) {
-            return await message.channel.send('The bot owner is only allowed to join the bot.');
-        }
         const connection = await message.member.voice.channel.join();
         await connection.voice?.setSelfDeaf(true);
         const ffmpegRecord = new prism_media_1.default.FFmpeg({
@@ -179,7 +176,6 @@ class PADBot {
         });
         // @ts-expect-error;
         const dispatcher = connection.player.playPCMStream(ffmpegRecord, { type: 'converted' }, { ffmpeg: ffmpegRecord });
-        dispatcher.on('debug', console.log);
         return await message.channel.send('Joined channel.');
     }
     async handleLeave(message) {
