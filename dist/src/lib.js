@@ -157,6 +157,7 @@ class PADBot {
             conn.channel.leave();
         });
         this.client.destroy();
+        process.exit();
     }
 }
 exports.PADBot = PADBot;

@@ -201,6 +201,7 @@ class PADBot {
     })
 
     this.client.destroy()
+    process.exit()
   }
 }
 
