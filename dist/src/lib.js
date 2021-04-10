@@ -32,6 +32,9 @@ class PADBot {
             ['!leave', { executor: this.handleLeave.bind(this), help: 'Leaves the voice channel', permittedGroups: ['any'] }],
             ['!volume', { executor: this.handleVolume.bind(this), help: '!volume <-10|10|10%|+10%|0.1|> - Changes the volume of the bot', permittedGroups: ['any'] }],
             ['!joinurl', { executor: this.handleJoinURL.bind(this), help: 'Returns the discord bot join url', permittedGroups: ['admin'] }],
+            ['!listgroups', { executor: this.handleListGroups.bind(this), help: 'Prints the groups in the state', permittedGroups: ['admin'] }],
+            ['!adduser', { executor: this.handleAddUser.bind(this), help: 'Adds a user to the group', permittedGroups: ['admin'] }],
+            ['!removeuser', { executor: this.handleRemoveUser.bind(this), help: 'Removes a user from the group', permittedGroups: ['admin'] }],
             ['!help', { executor: this.handleHelp.bind(this), help: 'Prints help information', permittedGroups: ['any'] }]
         ]);
         if (this.registerExit) {
@@ -92,6 +95,39 @@ class PADBot {
     }
     removeCommand(command) {
         this.handlers.delete(command);
+    }
+    async handleListGroups(message) {
+        const groups = this.getState().groups;
+        return await message.channel.send({
+            embed: {
+                color: 3447003,
+                title: 'Groups:',
+                fields: [
+                    { name: 'Group', value: Object.keys(groups).join('\n'), inline: true },
+                    { name: 'Members', value: Object.values(groups).join('\n'), inline: true }
+                ]
+            }
+        });
+    }
+    async handleAddUser(message) {
+        const cmdAndArgs = message.content.split(' ');
+        if (cmdAndArgs.length === 3) {
+            const user = cmdAndArgs[1];
+            const group = cmdAndArgs[2];
+            this.addUser(user, group);
+            return await message.channel.send(`Added ${user} to ${group}`);
+        }
+        return await message.channel.send('/adduser <user> <group>');
+    }
+    async handleRemoveUser(message) {
+        const cmdAndArgs = message.content.split(' ');
+        if (cmdAndArgs.length === 3) {
+            const user = cmdAndArgs[1];
+            const group = cmdAndArgs[2];
+            this.removeUser(user, group);
+            return await message.channel.send(`Removed ${user} from ${group}`);
+        }
+        return await message.channel.send('/removeuser <user> <group>');
     }
     async handleHelp(message) {
         return await message.channel.send({

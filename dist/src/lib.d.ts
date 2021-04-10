@@ -23,6 +23,9 @@ declare class PADBot {
     setState(newState: {}): void;
     addCommand(command: string, handler: Handler): void;
     removeCommand(command: string): void;
+    handleListGroups(message: Message): Promise<Message>;
+    handleAddUser(message: Message): Promise<Message>;
+    handleRemoveUser(message: Message): Promise<Message>;
     handleHelp(message: Message): Promise<Message>;
     handleCommand(message: Message): Promise<Message | undefined>;
     handleJoin(message: Message): Promise<Message | undefined>;
