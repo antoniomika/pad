@@ -1,4 +1,4 @@
-import { Client, Message } from 'discord.js';
+import { Client, Message, VoiceConnection } from 'discord.js';
 declare type Executor = (message: Message) => Promise<Message | undefined>;
 interface Handler {
     executor: Executor;
@@ -28,6 +28,7 @@ declare class PADBot {
     handleRemoveUser(message: Message): Promise<Message>;
     handleHelp(message: Message): Promise<Message>;
     handleCommand(message: Message): Promise<Message | undefined>;
+    startPCMStream(connection: VoiceConnection): any;
     handleJoin(message: Message): Promise<Message | undefined>;
     handleLeave(message: Message): Promise<Message | undefined>;
     handleVolume(message: Message): Promise<Message | undefined>;

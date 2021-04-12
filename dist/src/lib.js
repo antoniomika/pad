@@ -162,6 +162,14 @@ class PADBot {
             }
         }
     }
+    startPCMStream(connection) {
+        const ffmpegRecord = new prism_media_1.default.FFmpeg({
+            args: this.ffmpegInput.split(' ').concat(['-analyzeduration', '0', '-loglevel', '0', '-f', 's16le', '-ar', '48000', '-ac', '2'])
+        });
+        // @ts-expect-error;
+        const dispatcher = connection.player.playPCMStream(ffmpegRecord, { type: 'converted' }, { ffmpeg: ffmpegRecord });
+        return dispatcher;
+    }
     async handleJoin(message) {
         if (message.guild == null) {
             return;
@@ -171,11 +179,7 @@ class PADBot {
         }
         const connection = await message.member.voice.channel.join();
         await connection.voice?.setSelfDeaf(true);
-        const ffmpegRecord = new prism_media_1.default.FFmpeg({
-            args: this.ffmpegInput.split(' ').concat(['-analyzeduration', '0', '-loglevel', '0', '-f', 's16le', '-ar', '48000', '-ac', '2'])
-        });
-        // @ts-expect-error;
-        connection.player.playPCMStream(ffmpegRecord, { type: 'converted' }, { ffmpeg: ffmpegRecord });
+        this.startPCMStream(connection);
         return await message.channel.send('Joined channel.');
     }
     async handleLeave(message) {

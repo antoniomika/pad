@@ -1,4 +1,4 @@
-import { Client, Intents, Message } from 'discord.js'
+import { Client, Intents, Message, VoiceConnection } from 'discord.js'
 import { writeFileSync, readFileSync } from 'fs'
 import prism from 'prism-media'
 
@@ -209,6 +209,17 @@ class PADBot {
     }
   }
 
+  startPCMStream(connection: VoiceConnection): any {
+    const ffmpegRecord = new prism.FFmpeg({
+      args: this.ffmpegInput.split(' ').concat(['-analyzeduration', '0', '-loglevel', '0', '-f', 's16le', '-ar', '48000', '-ac', '2'])
+    })
+
+    // @ts-expect-error;
+    const dispatcher = connection.player.playPCMStream(ffmpegRecord, { type: 'converted' }, { ffmpeg: ffmpegRecord })
+
+    return dispatcher
+  }
+
   async handleJoin(message: Message): Promise<Message | undefined> {
     if (message.guild == null) {
       return
@@ -219,15 +230,9 @@ class PADBot {
     }
 
     const connection = await message.member.voice.channel.join()
-
     await connection.voice?.setSelfDeaf(true)
 
-    const ffmpegRecord = new prism.FFmpeg({
-      args: this.ffmpegInput.split(' ').concat(['-analyzeduration', '0', '-loglevel', '0', '-f', 's16le', '-ar', '48000', '-ac', '2'])
-    })
-
-    // @ts-expect-error;
-    connection.player.playPCMStream(ffmpegRecord, { type: 'converted' }, { ffmpeg: ffmpegRecord })
+    this.startPCMStream(connection)
 
     return await message.channel.send('Joined channel.')
   }
