@@ -165,11 +165,11 @@ class PADBot {
 
   addCommand(command: string, handler: Handler): void {
     handler.executor.bind(this)
-    this.handlers.set(command, handler)
+    this.handlers.set(`${this.commandFlag}${command}`, handler)
   }
 
   removeCommand(command: string): void {
-    this.handlers.delete(command)
+    this.handlers.delete(`${this.commandFlag}${command}`)
   }
 
   async handleHelp(message: Message, handler: Handler): Promise<Message> {

@@ -53,7 +53,7 @@ jobs:
 
         if [[ "${GITHUB_ACTOR}" == "${GITHUB_REPOSITORY%/*}" ]]; then
           OTHER_PUSH_ARGS="${OTHER_PUSH_ARGS} --push"
-          OTHER_ARGS="${OTHER_ARGS} --platform linux/arm/v7,linux/arm64,linux/amd64 --cache-to type=registry,ref=${GITHUB_REPOSITORY}-cache,mode=max"
+          OTHER_ARGS="${OTHER_ARGS} --platform linux/amd64 --cache-to type=registry,ref=${GITHUB_REPOSITORY}-cache,mode=max"
         else
           OTHER_ARGS="${OTHER_ARGS} --load"
         fi
