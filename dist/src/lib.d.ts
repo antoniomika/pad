@@ -1,4 +1,4 @@
-import { Client, Message, VoiceConnection } from 'discord.js';
+import { Client, Message, Snowflake, VoiceConnection } from 'discord.js';
 declare type Result = Message | undefined | boolean | null;
 declare type PromiseResult = Promise<Result>;
 declare type Executor = (message: Message, handler: Handler) => PromiseResult;
@@ -15,18 +15,17 @@ declare class PADBot {
     ffmpegInput: string;
     registerExit: boolean;
     commandFlag: string;
+    autoStartPCM: boolean;
     client: Client;
     handlers: Map<string, Handler>;
     preHooks: Executor[];
     postHooks: Executor[];
     state: any;
-    constructor(discordToken: string, discordClientID: string, discordBotOwnerTag: string, ffmpegInput: string, registerExit?: boolean, commandFlag?: string);
-    addUser(user: string, group: string): void;
-    removeUser(user: string, group: string): void;
+    constructor(discordToken: string, discordClientID: string, discordBotOwnerTag: string, ffmpegInput: string, registerExit?: boolean, commandFlag?: string, autoStartPCM?: boolean);
+    addUser(guildId: Snowflake | undefined, user: string, group: string): void;
+    removeUser(guildId: Snowflake | undefined, user: string, group: string): void;
     loadState(): void;
     saveState(): void;
-    getState(): any;
-    setState(newState: {}): void;
     addCommand(command: string, handler: Handler): void;
     addPreHook(executor: Executor, position?: number): void;
     addPostHook(executor: Executor, position?: number): void;

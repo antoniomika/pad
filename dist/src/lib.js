@@ -8,13 +8,14 @@ const discord_js_1 = require("discord.js");
 const fs_1 = require("fs");
 const prism_media_1 = __importDefault(require("prism-media"));
 class PADBot {
-    constructor(discordToken, discordClientID, discordBotOwnerTag, ffmpegInput, registerExit = true, commandFlag = '!') {
+    constructor(discordToken, discordClientID, discordBotOwnerTag, ffmpegInput, registerExit = true, commandFlag = '!', autoStartPCM = true) {
         this.discordToken = discordToken;
         this.discordClientID = discordClientID;
         this.discordBotOwnerTag = discordBotOwnerTag;
         this.ffmpegInput = ffmpegInput;
         this.registerExit = registerExit;
         this.commandFlag = commandFlag;
+        this.autoStartPCM = autoStartPCM;
         this.client = new discord_js_1.Client({
             ws: {
                 intents: [
@@ -87,24 +88,19 @@ class PADBot {
         this.loadState();
         if (Object.keys(this.state).length === 0) {
             this.state = {
-                groups: {
-                    admin: []
-                }
+                guilds: {}
             };
         }
-        if (this.state.groups.admin.length === 0) {
-            this.state.groups.admin.push(this.discordBotOwnerTag);
-        }
     }
-    addUser(user, group) {
-        if (!(group in this.state.groups)) {
-            this.state.groups[group] = [];
+    addUser(guildId, user, group) {
+        if (guildId !== undefined && this.state.guilds[guildId].groups[group] === undefined) {
+            this.state.guilds[guildId].groups[group] = [];
         }
         this.state.groups[group].push(user);
     }
-    removeUser(user, group) {
-        if (group in this.state.groups) {
-            const loc = this.state.groups[group].indexOf(user);
+    removeUser(guildId, user, group) {
+        if (guildId !== undefined && this.state.guilds[guildId].groups[group] !== undefined) {
+            const loc = this.state.guilds[guildId].groups[group].indexOf(user);
             if (loc > -1) {
                 this.state.groups[group].splice(loc, 1);
             }
@@ -125,12 +121,6 @@ class PADBot {
         catch (err) {
             console.error(err);
         }
-    }
-    getState() {
-        return this.state;
-    }
-    setState(newState) {
-        this.state = newState;
     }
     addCommand(command, handler) {
         this.handlers.set(`${this.commandFlag}${command}`, handler);
@@ -185,6 +175,13 @@ class PADBot {
     async handleCommand(message) {
         const commandRoot = message.content.split(' ')[0];
         let handlerResult;
+        if (message.guild !== null && this.state.guilds[message.guild.id] === undefined) {
+            this.state.guilds[message.guild.id] = {
+                groups: {
+                    admin: [this.discordBotOwnerTag]
+                }
+            };
+        }
         const handler = this.handlers.get(commandRoot);
         if (handler !== undefined) {
             for (const executor of this.preHooks) {
@@ -196,14 +193,18 @@ class PADBot {
             if (handler.permittedGroups.includes('any')) {
                 handlerResult = await handler.executor(message, handler);
             }
-            if (message.member !== null) {
-                const groups = this.getState().groups;
-                for (const group in groups) {
-                    for (const member of groups[group]) {
-                        if (member === message.member.user.tag && handler.permittedGroups.includes(group)) {
-                            handlerResult = await handler.executor(message, handler);
+            else {
+                if (message.guild !== null) {
+                    const groups = this.state.guilds[message.guild.id].groups;
+                    handlerResult = await (async () => {
+                        for (const group in groups) {
+                            for (const member of groups[group]) {
+                                if (member === message.member?.user?.tag && handler.permittedGroups.includes(group)) {
+                                    return await handler.executor(message, handler);
+                                }
+                            }
                         }
-                    }
+                    })();
                 }
             }
             for (const executor of this.postHooks) {
@@ -224,7 +225,7 @@ class PADBot {
         if (cmdAndArgs.length === 3) {
             const user = cmdAndArgs[1];
             const group = cmdAndArgs[2];
-            this.addUser(user, group);
+            this.addUser(message.guild?.id, user, group);
             return await message.channel.send(`Added ${user} to ${group}`);
         }
         return await message.channel.send(handler.example);
@@ -234,13 +235,16 @@ class PADBot {
         if (cmdAndArgs.length === 3) {
             const user = cmdAndArgs[1];
             const group = cmdAndArgs[2];
-            this.removeUser(user, group);
+            this.removeUser(message.guild?.id, user, group);
             return await message.channel.send(`Removed ${user} from ${group}`);
         }
         return await message.channel.send(handler.example);
     }
     async handleListGroups(message, handler) {
-        const groups = this.getState().groups;
+        if (message.guild === null) {
+            return;
+        }
+        const groups = this.state.guilds[message.guild?.id].groups;
         return await message.channel.send({
             embed: {
                 color: 3447003,
@@ -254,29 +258,31 @@ class PADBot {
         });
     }
     async handleJoin(message, handler) {
-        if (message.guild == null) {
+        if (message.guild === null) {
             return;
         }
-        if (message.member == null || (message.member.voice.channel == null)) {
+        if (message.member === null || (message.member.voice.channel === null)) {
             return await message.channel.send('You need to join a voice channel first!');
         }
         const connection = await message.member.voice.channel.join();
         await connection.voice?.setSelfDeaf(true);
-        this.startPCMStream(connection);
+        if (this.autoStartPCM) {
+            this.startPCMStream(connection);
+        }
         return await message.channel.send('Joined channel.');
     }
     async handleLeave(message, handler) {
-        if (message.guild == null) {
+        if (message.guild === null) {
             return;
         }
-        message.guild?.voice?.channel?.leave();
+        message.guild.voice?.channel?.leave();
         return await message.channel.send('Left channel.');
     }
     async handleVolume(message, handler) {
-        if (message.guild == null) {
+        if (message.guild === null) {
             return;
         }
-        if (message.member == null || (message.member.voice.channel == null) || message.guild?.voice?.connection == null) {
+        if (message.member?.voice?.channel === null || message.guild?.voice?.connection === null || message.guild?.voice?.connection === undefined) {
             return await message.channel.send('You need to join a voice channel first!');
         }
         let volume = message.guild.voice.connection.dispatcher.volumeLogarithmic;
@@ -331,7 +337,7 @@ class PADBot {
         }
     }
     async handleJoinURL(message, handler) {
-        if (message.guild == null) {
+        if (message.guild === null) {
             return;
         }
         return await message.channel.send(`https://discord.com/api/oauth2/authorize?client_id=${this.discordClientID}&permissions=103827520&scope=bot`);
