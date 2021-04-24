@@ -12,10 +12,11 @@ declare class PADBot {
     discordBotOwnerTag: string;
     ffmpegInput: string;
     registerExit: boolean;
+    commandFlag: string;
     client: Client;
     handlers: Map<string, Handler>;
     state: any;
-    constructor(discordToken: string, discordClientID: string, discordBotOwnerTag: string, ffmpegInput: string, registerExit?: boolean);
+    constructor(discordToken: string, discordClientID: string, discordBotOwnerTag: string, ffmpegInput: string, registerExit?: boolean, commandFlag?: string);
     addUser(user: string, group: string): void;
     removeUser(user: string, group: string): void;
     loadState(): void;

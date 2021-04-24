@@ -18,6 +18,7 @@ class PADBot {
 
   ffmpegInput: string
   registerExit: boolean
+  commandFlag: string
 
   client: Client
 
@@ -25,13 +26,14 @@ class PADBot {
 
   state: any
 
-  constructor(discordToken: string, discordClientID: string, discordBotOwnerTag: string, ffmpegInput: string, registerExit: boolean = true) {
+  constructor(discordToken: string, discordClientID: string, discordBotOwnerTag: string, ffmpegInput: string, registerExit: boolean = true, commandFlag: string = '!') {
     this.discordToken = discordToken
     this.discordClientID = discordClientID
     this.discordBotOwnerTag = discordBotOwnerTag
 
     this.ffmpegInput = ffmpegInput
     this.registerExit = registerExit
+    this.commandFlag = commandFlag
 
     this.client = new Client({
       ws: {
@@ -50,52 +52,52 @@ class PADBot {
     })
 
     this.handlers = new Map([
-      ['!join', {
+      [`${this.commandFlag}join`, {
         executor: this.handleJoin.bind(this),
         help: 'Joins the channel of the calling user',
-        example: '!join',
+        example: `${this.commandFlag}join`,
         permittedGroups: ['admin']
       }],
-      ['!leave', {
+      [`${this.commandFlag}leave`, {
         executor: this.handleLeave.bind(this),
         help: 'Leaves the voice channel',
-        example: '!leave',
+        example: `${this.commandFlag}leave`,
         permittedGroups: ['any']
       }],
-      ['!volume', {
+      [`${this.commandFlag}volume`, {
         executor: this.handleVolume.bind(this),
         help: 'Changes the volume of the bot',
-        example: '!volume <-10|10|10%|+10%|0.1|>',
+        example: `${this.commandFlag}volume <-10|10|10%|+10%|0.1|>`,
         permittedGroups: ['any']
       }],
-      ['!joinurl', {
+      [`${this.commandFlag}joinurl`, {
         executor: this.handleJoinURL.bind(this),
         help: 'Returns the discord bot join url',
-        example: '!joinurl',
+        example: `${this.commandFlag}joinurl`,
         permittedGroups: ['admin']
       }],
-      ['!listgroups', {
+      [`${this.commandFlag}listgroups`, {
         executor: this.handleListGroups.bind(this),
         help: 'Prints the groups in the state',
-        example: '!listgroups',
+        example: `${this.commandFlag}listgroups`,
         permittedGroups: ['admin']
       }],
-      ['!adduser', {
+      [`${this.commandFlag}adduser`, {
         executor: this.handleAddUser.bind(this),
         help: 'Adds a user to the group',
-        example: '!adduser <user> <group>',
+        example: `${this.commandFlag}adduser <user> <group>`,
         permittedGroups: ['admin']
       }],
-      ['!removeuser', {
+      [`${this.commandFlag}removeuser`, {
         executor: this.handleRemoveUser.bind(this),
         help: 'Removes a user from the group',
-        example: '!removeuser <user> <group>',
+        example: `${this.commandFlag}removeuser <user> <group>`,
         permittedGroups: ['admin']
       }],
-      ['!help', {
+      [`${this.commandFlag}help`, {
         executor: this.handleHelp.bind(this),
         help: 'Prints help information',
-        example: '!help',
+        example: `${this.commandFlag}help`,
         permittedGroups: ['any']
       }]
     ])
@@ -171,16 +173,22 @@ class PADBot {
   }
 
   async handleHelp(message: Message, handler: Handler): Promise<Message> {
-    return await message.channel.send({
+    const fields = [
+      { name: 'Command', value: Array.from(this.handlers.keys()).join('\n'), inline: true },
+      { name: 'Help', value: Array.from(this.handlers.values()).map((h) => h.help).join('\n'), inline: true },
+      { name: 'Example', value: Array.from(this.handlers.values()).map((h) => h.example).join('\n'), inline: true }
+    ]
+
+    const cmdAndArgs = message.content.split(' ')
+    if (cmdAndArgs.length > 1 && cmdAndArgs[1].includes('group')) {
+      fields[2] = { name: 'Permitted Groups', value: Array.from(this.handlers.values()).map((h) => h.permittedGroups.join(', ')).join('\n'), inline: true }
+    }
+
+    return message.channel.send({
       embed: {
         color: 3447003,
         title: 'Available commands:',
-        fields: [
-          { name: 'Command', value: Array.from(this.handlers.keys()).join('\n'), inline: true },
-          { name: 'Help', value: Array.from(this.handlers.values()).map((h) => h.help).join('\n'), inline: true },
-          { name: 'Example', value: Array.from(this.handlers.values()).map((h) => h.example).join('\n'), inline: true },
-          { name: 'Permitted Groups', value: Array.from(this.handlers.values()).map((h) => h.permittedGroups.join(', ')).join('\n'), inline: true }
-        ]
+        fields: fields
       }
     })
   }
