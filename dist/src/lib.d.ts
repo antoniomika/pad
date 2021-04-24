@@ -1,8 +1,9 @@
 import { Client, Message, VoiceConnection } from 'discord.js';
-declare type Executor = (message: Message) => Promise<Message | undefined>;
+declare type Executor = (message: Message, handler: Handler) => Promise<Message | undefined>;
 interface Handler {
     executor: Executor;
     help: string;
+    example: string;
     permittedGroups: string[];
 }
 declare class PADBot {
@@ -23,16 +24,16 @@ declare class PADBot {
     setState(newState: {}): void;
     addCommand(command: string, handler: Handler): void;
     removeCommand(command: string): void;
-    handleListGroups(message: Message): Promise<Message>;
-    handleAddUser(message: Message): Promise<Message>;
-    handleRemoveUser(message: Message): Promise<Message>;
-    handleHelp(message: Message): Promise<Message>;
+    handleHelp(message: Message, handler: Handler): Promise<Message>;
     handleCommand(message: Message): Promise<Message | undefined>;
     startPCMStream(connection: VoiceConnection): any;
-    handleJoin(message: Message): Promise<Message | undefined>;
-    handleLeave(message: Message): Promise<Message | undefined>;
-    handleVolume(message: Message): Promise<Message | undefined>;
-    handleJoinURL(message: Message): Promise<Message | undefined>;
+    handleAddUser(message: Message, handler: Handler): Promise<Message>;
+    handleRemoveUser(message: Message, handler: Handler): Promise<Message>;
+    handleListGroups(message: Message, handler: Handler): Promise<Message>;
+    handleJoin(message: Message, handler: Handler): Promise<Message | undefined>;
+    handleLeave(message: Message, handler: Handler): Promise<Message | undefined>;
+    handleVolume(message: Message, handler: Handler): Promise<Message | undefined>;
+    handleJoinURL(message: Message, handler: Handler): Promise<Message | undefined>;
     registerExitHandler(): void;
     destroy(): void;
 }

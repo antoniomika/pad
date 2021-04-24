@@ -28,14 +28,54 @@ class PADBot {
             this.handleCommand(message).catch(console.error);
         });
         this.handlers = new Map([
-            ['!join', { executor: this.handleJoin.bind(this), help: 'Joins the channel of the calling user', permittedGroups: ['admin'] }],
-            ['!leave', { executor: this.handleLeave.bind(this), help: 'Leaves the voice channel', permittedGroups: ['any'] }],
-            ['!volume', { executor: this.handleVolume.bind(this), help: '!volume <-10|10|10%|+10%|0.1|> - Changes the volume of the bot', permittedGroups: ['any'] }],
-            ['!joinurl', { executor: this.handleJoinURL.bind(this), help: 'Returns the discord bot join url', permittedGroups: ['admin'] }],
-            ['!listgroups', { executor: this.handleListGroups.bind(this), help: 'Prints the groups in the state', permittedGroups: ['admin'] }],
-            ['!adduser', { executor: this.handleAddUser.bind(this), help: 'Adds a user to the group', permittedGroups: ['admin'] }],
-            ['!removeuser', { executor: this.handleRemoveUser.bind(this), help: 'Removes a user from the group', permittedGroups: ['admin'] }],
-            ['!help', { executor: this.handleHelp.bind(this), help: 'Prints help information', permittedGroups: ['any'] }]
+            ['!join', {
+                    executor: this.handleJoin.bind(this),
+                    help: 'Joins the channel of the calling user',
+                    example: '!join',
+                    permittedGroups: ['admin']
+                }],
+            ['!leave', {
+                    executor: this.handleLeave.bind(this),
+                    help: 'Leaves the voice channel',
+                    example: '!leave',
+                    permittedGroups: ['any']
+                }],
+            ['!volume', {
+                    executor: this.handleVolume.bind(this),
+                    help: 'Changes the volume of the bot',
+                    example: '!volume <-10|10|10%|+10%|0.1|>',
+                    permittedGroups: ['any']
+                }],
+            ['!joinurl', {
+                    executor: this.handleJoinURL.bind(this),
+                    help: 'Returns the discord bot join url',
+                    example: '!joinurl',
+                    permittedGroups: ['admin']
+                }],
+            ['!listgroups', {
+                    executor: this.handleListGroups.bind(this),
+                    help: 'Prints the groups in the state',
+                    example: '!listgroups',
+                    permittedGroups: ['admin']
+                }],
+            ['!adduser', {
+                    executor: this.handleAddUser.bind(this),
+                    help: 'Adds a user to the group',
+                    example: '!adduser <user> <group>',
+                    permittedGroups: ['admin']
+                }],
+            ['!removeuser', {
+                    executor: this.handleRemoveUser.bind(this),
+                    help: 'Removes a user from the group',
+                    example: '!removeuser <user> <group>',
+                    permittedGroups: ['admin']
+                }],
+            ['!help', {
+                    executor: this.handleHelp.bind(this),
+                    help: 'Prints help information',
+                    example: '!help',
+                    permittedGroups: ['any']
+                }]
         ]);
         if (this.registerExit) {
             this.registerExitHandler();
@@ -96,7 +136,67 @@ class PADBot {
     removeCommand(command) {
         this.handlers.delete(command);
     }
-    async handleListGroups(message) {
+    async handleHelp(message, handler) {
+        return await message.channel.send({
+            embed: {
+                color: 3447003,
+                title: 'Available commands:',
+                fields: [
+                    { name: 'Command', value: Array.from(this.handlers.keys()).join('\n'), inline: true },
+                    { name: 'Help', value: Array.from(this.handlers.values()).map((h) => h.help).join('\n'), inline: true },
+                    { name: 'Example', value: Array.from(this.handlers.values()).map((h) => h.example).join('\n'), inline: true },
+                    { name: 'Permitted Groups', value: Array.from(this.handlers.values()).map((h) => h.permittedGroups.join(', ')).join('\n'), inline: true }
+                ]
+            }
+        });
+    }
+    async handleCommand(message) {
+        const commandRoot = message.content.split(' ')[0];
+        const handler = this.handlers.get(commandRoot);
+        if (handler !== undefined) {
+            if (handler.permittedGroups.includes('any')) {
+                return await handler.executor(message, handler);
+            }
+            if (message.member !== null) {
+                const groups = this.getState().groups;
+                for (const group in groups) {
+                    for (const member of groups[group]) {
+                        if (member === message.member.user.tag && handler.permittedGroups.includes(group)) {
+                            return await handler.executor(message, handler);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    startPCMStream(connection) {
+        const ffmpegRecord = new prism_media_1.default.FFmpeg({
+            args: this.ffmpegInput.split(' ').concat(['-analyzeduration', '0', '-loglevel', '0', '-f', 's16le', '-ar', '48000', '-ac', '2'])
+        });
+        // @ts-expect-error;
+        return connection.player.playPCMStream(ffmpegRecord, { type: 'converted' }, { ffmpeg: ffmpegRecord });
+    }
+    async handleAddUser(message, handler) {
+        const cmdAndArgs = message.content.split(' ');
+        if (cmdAndArgs.length === 3) {
+            const user = cmdAndArgs[1];
+            const group = cmdAndArgs[2];
+            this.addUser(user, group);
+            return await message.channel.send(`Added ${user} to ${group}`);
+        }
+        return await message.channel.send(handler.example);
+    }
+    async handleRemoveUser(message, handler) {
+        const cmdAndArgs = message.content.split(' ');
+        if (cmdAndArgs.length === 3) {
+            const user = cmdAndArgs[1];
+            const group = cmdAndArgs[2];
+            this.removeUser(user, group);
+            return await message.channel.send(`Removed ${user} from ${group}`);
+        }
+        return await message.channel.send(handler.example);
+    }
+    async handleListGroups(message, handler) {
         const groups = this.getState().groups;
         return await message.channel.send({
             embed: {
@@ -110,67 +210,7 @@ class PADBot {
             }
         });
     }
-    async handleAddUser(message) {
-        const cmdAndArgs = message.content.split(' ');
-        if (cmdAndArgs.length === 3) {
-            const user = cmdAndArgs[1];
-            const group = cmdAndArgs[2];
-            this.addUser(user, group);
-            return await message.channel.send(`Added ${user} to ${group}`);
-        }
-        return await message.channel.send('!adduser <user> <group>');
-    }
-    async handleRemoveUser(message) {
-        const cmdAndArgs = message.content.split(' ');
-        if (cmdAndArgs.length === 3) {
-            const user = cmdAndArgs[1];
-            const group = cmdAndArgs[2];
-            this.removeUser(user, group);
-            return await message.channel.send(`Removed ${user} from ${group}`);
-        }
-        return await message.channel.send('!removeuser <user> <group>');
-    }
-    async handleHelp(message) {
-        return await message.channel.send({
-            embed: {
-                color: 3447003,
-                title: 'Available commands:',
-                fields: [
-                    { name: 'Command', value: Array.from(this.handlers.keys()).join('\n'), inline: true },
-                    { name: 'Help', value: Array.from(this.handlers.values()).map((h) => h.help).join('\n'), inline: true },
-                    { name: 'Permitted Groups', value: Array.from(this.handlers.values()).map((h) => h.permittedGroups.join(', ')).join('\n'), inline: true }
-                ]
-            }
-        });
-    }
-    async handleCommand(message) {
-        const commandRoot = message.content.split(' ')[0];
-        const handler = this.handlers.get(commandRoot);
-        if (handler !== undefined) {
-            if (handler.permittedGroups.includes('any')) {
-                return await handler.executor(message);
-            }
-            if (message.member !== null) {
-                const groups = this.getState().groups;
-                for (const group in groups) {
-                    for (const member of groups[group]) {
-                        if (member === message.member.user.tag && handler.permittedGroups.includes(group)) {
-                            return await handler.executor(message);
-                        }
-                    }
-                }
-            }
-        }
-    }
-    startPCMStream(connection) {
-        const ffmpegRecord = new prism_media_1.default.FFmpeg({
-            args: this.ffmpegInput.split(' ').concat(['-analyzeduration', '0', '-loglevel', '0', '-f', 's16le', '-ar', '48000', '-ac', '2'])
-        });
-        // @ts-expect-error;
-        const dispatcher = connection.player.playPCMStream(ffmpegRecord, { type: 'converted' }, { ffmpeg: ffmpegRecord });
-        return dispatcher;
-    }
-    async handleJoin(message) {
+    async handleJoin(message, handler) {
         if (message.guild == null) {
             return;
         }
@@ -182,14 +222,14 @@ class PADBot {
         this.startPCMStream(connection);
         return await message.channel.send('Joined channel.');
     }
-    async handleLeave(message) {
+    async handleLeave(message, handler) {
         if (message.guild == null) {
             return;
         }
         message.guild?.voice?.channel?.leave();
         return await message.channel.send('Left channel.');
     }
-    async handleVolume(message) {
+    async handleVolume(message, handler) {
         if (message.guild == null) {
             return;
         }
@@ -202,7 +242,7 @@ class PADBot {
             return await message.channel.send(`Current volume is ${volume * 100}.`);
         }
         if (cmdAndArgs.length !== 2) {
-            return await message.channel.send('!volume <-10|10|10%|+10%|0.1|>');
+            return await message.channel.send(handler.example);
         }
         const change = cmdAndArgs[1];
         try {
@@ -247,7 +287,7 @@ class PADBot {
             return await message.channel.send('An error occurred while changing the volume.');
         }
     }
-    async handleJoinURL(message) {
+    async handleJoinURL(message, handler) {
         if (message.guild == null) {
             return;
         }
