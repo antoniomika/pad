@@ -38,5 +38,5 @@ declare class PADBot {
     registerExitHandler(): void;
     destroy(): void;
 }
-export { PADBot, Handler };
+export { PADBot, Handler, Executor };
 //# sourceMappingURL=lib.d.ts.map

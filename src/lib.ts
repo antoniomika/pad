@@ -384,4 +384,4 @@ class PADBot {
   }
 }
 
-export { PADBot, Handler }
+export { PADBot, Handler, Executor }
