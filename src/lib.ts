@@ -2,7 +2,10 @@ import { Client, Intents, Message, VoiceConnection } from 'discord.js'
 import { writeFileSync, readFileSync } from 'fs'
 import prism from 'prism-media'
 
-type Executor = (message: Message, handler: Handler) => Promise<Message | undefined>
+type Result = Message | undefined | boolean | null
+type PromiseResult = Promise<Result>
+
+type Executor = (message: Message, handler: Handler) => PromiseResult
 
 interface Handler {
   executor: Executor
@@ -23,6 +26,8 @@ class PADBot {
   client: Client
 
   handlers: Map<string, Handler>
+  preHooks: Executor[]
+  postHooks: Executor[]
 
   state: any
 
@@ -102,6 +107,9 @@ class PADBot {
       }]
     ])
 
+    this.preHooks = []
+    this.postHooks = []
+
     if (this.registerExit) {
       this.registerExitHandler()
     }
@@ -164,15 +172,46 @@ class PADBot {
   }
 
   addCommand(command: string, handler: Handler): void {
-    handler.executor.bind(this)
     this.handlers.set(`${this.commandFlag}${command}`, handler)
+  }
+
+  addPreHook(executor: Executor, position?: number): void {
+    if (position !== undefined) {
+      this.preHooks.splice(position, 0, executor)
+    }
+    this.preHooks.push(executor)
+  }
+
+  addPostHook(executor: Executor, position?: number): void {
+    if (position !== undefined) {
+      this.postHooks.splice(position, 0, executor)
+    }
+    this.postHooks.push(executor)
+  }
+
+  removePreHook(position: number = 0, executor?: Executor): void {
+    let pos = position
+    if (executor !== undefined) {
+      pos = this.preHooks.indexOf(executor)
+    }
+
+    this.preHooks.splice(pos, 1)
+  }
+
+  removePostHook(position: number = 0, executor?: Executor): void {
+    let pos = position
+    if (executor !== undefined) {
+      pos = this.postHooks.indexOf(executor)
+    }
+
+    this.postHooks.splice(pos, 1)
   }
 
   removeCommand(command: string): void {
     this.handlers.delete(`${this.commandFlag}${command}`)
   }
 
-  async handleHelp(message: Message, handler: Handler): Promise<Message> {
+  async handleHelp(message: Message, handler: Handler): PromiseResult {
     const fields = [
       { name: 'Command', value: Array.from(this.handlers.keys()).join('\n'), inline: true },
       { name: 'Help', value: Array.from(this.handlers.values()).map((h) => h.help).join('\n'), inline: true },
@@ -193,13 +232,21 @@ class PADBot {
     })
   }
 
-  async handleCommand(message: Message): Promise<Message | undefined> {
+  async handleCommand(message: Message): PromiseResult {
     const commandRoot = message.content.split(' ')[0]
+    let handlerResult: Result
 
     const handler = this.handlers.get(commandRoot)
     if (handler !== undefined) {
+      for (const executor of this.preHooks) {
+        const res = await executor(message, handler)
+        if (res === false) {
+          return res
+        }
+      }
+
       if (handler.permittedGroups.includes('any')) {
-        return await handler.executor(message, handler)
+        handlerResult = await handler.executor(message, handler)
       }
 
       if (message.member !== null) {
@@ -207,11 +254,17 @@ class PADBot {
         for (const group in groups) {
           for (const member of groups[group]) {
             if (member === message.member.user.tag && handler.permittedGroups.includes(group)) {
-              return await handler.executor(message, handler)
+              handlerResult = await handler.executor(message, handler)
             }
           }
         }
       }
+
+      for (const executor of this.postHooks) {
+        await executor(message, handler)
+      }
+
+      return handlerResult
     }
   }
 
@@ -224,7 +277,7 @@ class PADBot {
     return connection.player.playPCMStream(ffmpegRecord, { type: 'converted' }, { ffmpeg: ffmpegRecord })
   }
 
-  async handleAddUser(message: Message, handler: Handler): Promise<Message> {
+  async handleAddUser(message: Message, handler: Handler): PromiseResult {
     const cmdAndArgs = message.content.split(' ')
     if (cmdAndArgs.length === 3) {
       const user = cmdAndArgs[1]
@@ -238,7 +291,7 @@ class PADBot {
     return await message.channel.send(handler.example)
   }
 
-  async handleRemoveUser(message: Message, handler: Handler): Promise<Message> {
+  async handleRemoveUser(message: Message, handler: Handler): PromiseResult {
     const cmdAndArgs = message.content.split(' ')
     if (cmdAndArgs.length === 3) {
       const user = cmdAndArgs[1]
@@ -252,7 +305,7 @@ class PADBot {
     return await message.channel.send(handler.example)
   }
 
-  async handleListGroups(message: Message, handler: Handler): Promise<Message> {
+  async handleListGroups(message: Message, handler: Handler): PromiseResult {
     const groups = this.getState().groups
 
     return await message.channel.send({
@@ -268,7 +321,7 @@ class PADBot {
     })
   }
 
-  async handleJoin(message: Message, handler: Handler): Promise<Message | undefined> {
+  async handleJoin(message: Message, handler: Handler): PromiseResult {
     if (message.guild == null) {
       return
     }
@@ -285,7 +338,7 @@ class PADBot {
     return await message.channel.send('Joined channel.')
   }
 
-  async handleLeave(message: Message, handler: Handler): Promise<Message | undefined> {
+  async handleLeave(message: Message, handler: Handler): PromiseResult {
     if (message.guild == null) {
       return
     }
@@ -294,7 +347,7 @@ class PADBot {
     return await message.channel.send('Left channel.')
   }
 
-  async handleVolume(message: Message, handler: Handler): Promise<Message | undefined> {
+  async handleVolume(message: Message, handler: Handler): PromiseResult {
     if (message.guild == null) {
       return
     }
@@ -360,7 +413,7 @@ class PADBot {
     }
   }
 
-  async handleJoinURL(message: Message, handler: Handler): Promise<Message | undefined> {
+  async handleJoinURL(message: Message, handler: Handler): PromiseResult {
     if (message.guild == null) {
       return
     }
@@ -384,4 +437,4 @@ class PADBot {
   }
 }
 
-export { PADBot, Handler, Executor }
+export { PADBot, Handler, Executor, Result, PromiseResult }
