@@ -78,6 +78,8 @@ class PADBot {
                     permittedGroups: ['any']
                 }]
         ]);
+        this.preHooks = [];
+        this.postHooks = [];
         if (this.registerExit) {
             this.registerExitHandler();
         }
@@ -131,8 +133,33 @@ class PADBot {
         this.state = newState;
     }
     addCommand(command, handler) {
-        handler.executor.bind(this);
         this.handlers.set(`${this.commandFlag}${command}`, handler);
+    }
+    addPreHook(executor, position) {
+        if (position !== undefined) {
+            this.preHooks.splice(position, 0, executor);
+        }
+        this.preHooks.push(executor);
+    }
+    addPostHook(executor, position) {
+        if (position !== undefined) {
+            this.postHooks.splice(position, 0, executor);
+        }
+        this.postHooks.push(executor);
+    }
+    removePreHook(position = 0, executor) {
+        let pos = position;
+        if (executor !== undefined) {
+            pos = this.preHooks.indexOf(executor);
+        }
+        this.preHooks.splice(pos, 1);
+    }
+    removePostHook(position = 0, executor) {
+        let pos = position;
+        if (executor !== undefined) {
+            pos = this.postHooks.indexOf(executor);
+        }
+        this.postHooks.splice(pos, 1);
     }
     removeCommand(command) {
         this.handlers.delete(`${this.commandFlag}${command}`);
@@ -157,21 +184,32 @@ class PADBot {
     }
     async handleCommand(message) {
         const commandRoot = message.content.split(' ')[0];
+        let handlerResult;
         const handler = this.handlers.get(commandRoot);
         if (handler !== undefined) {
+            for (const executor of this.preHooks) {
+                const res = await executor(message, handler);
+                if (res === false) {
+                    return res;
+                }
+            }
             if (handler.permittedGroups.includes('any')) {
-                return await handler.executor(message, handler);
+                handlerResult = await handler.executor(message, handler);
             }
             if (message.member !== null) {
                 const groups = this.getState().groups;
                 for (const group in groups) {
                     for (const member of groups[group]) {
                         if (member === message.member.user.tag && handler.permittedGroups.includes(group)) {
-                            return await handler.executor(message, handler);
+                            handlerResult = await handler.executor(message, handler);
                         }
                     }
                 }
             }
+            for (const executor of this.postHooks) {
+                await executor(message, handler);
+            }
+            return handlerResult;
         }
     }
     startPCMStream(connection) {
