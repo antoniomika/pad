@@ -54,7 +54,7 @@ class PADBot {
     this.handlers = new Map([
       [`${this.commandFlag}join`, {
         executor: this.handleJoin.bind(this),
-        help: 'Joins the channel of the calling user',
+        help: 'Joins the user\'s channel',
         example: `${this.commandFlag}join`,
         permittedGroups: ['admin']
       }],
