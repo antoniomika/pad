@@ -1,4 +1,4 @@
-import { Client, Intents, Message, VoiceConnection } from 'discord.js'
+import { Client, Intents, Message, Snowflake, VoiceConnection } from 'discord.js'
 import { writeFileSync, readFileSync } from 'fs'
 import prism from 'prism-media'
 
@@ -22,6 +22,7 @@ class PADBot {
   ffmpegInput: string
   registerExit: boolean
   commandFlag: string
+  autoStartPCM: boolean
 
   client: Client
 
@@ -31,7 +32,7 @@ class PADBot {
 
   state: any
 
-  constructor(discordToken: string, discordClientID: string, discordBotOwnerTag: string, ffmpegInput: string, registerExit: boolean = true, commandFlag: string = '!') {
+  constructor(discordToken: string, discordClientID: string, discordBotOwnerTag: string, ffmpegInput: string, registerExit: boolean = true, commandFlag: string = '!', autoStartPCM: boolean = true) {
     this.discordToken = discordToken
     this.discordClientID = discordClientID
     this.discordBotOwnerTag = discordBotOwnerTag
@@ -39,6 +40,7 @@ class PADBot {
     this.ffmpegInput = ffmpegInput
     this.registerExit = registerExit
     this.commandFlag = commandFlag
+    this.autoStartPCM = autoStartPCM
 
     this.client = new Client({
       ws: {
@@ -119,28 +121,22 @@ class PADBot {
 
     if (Object.keys(this.state).length === 0) {
       this.state = {
-        groups: {
-          admin: []
-        }
+        guilds: {}
       }
-    }
-
-    if (this.state.groups.admin.length === 0) {
-      this.state.groups.admin.push(this.discordBotOwnerTag)
     }
   }
 
-  addUser(user: string, group: string): void {
-    if (!(group in this.state.groups)) {
-      this.state.groups[group] = []
+  addUser(guildId: Snowflake | undefined, user: string, group: string): void {
+    if (guildId !== undefined && this.state.guilds[guildId].groups[group] === undefined) {
+      this.state.guilds[guildId].groups[group] = []
     }
 
     this.state.groups[group].push(user)
   }
 
-  removeUser(user: string, group: string): void {
-    if (group in this.state.groups) {
-      const loc = this.state.groups[group].indexOf(user)
+  removeUser(guildId: Snowflake | undefined, user: string, group: string): void {
+    if (guildId !== undefined && this.state.guilds[guildId].groups[group] !== undefined) {
+      const loc = this.state.guilds[guildId].groups[group].indexOf(user)
       if (loc > -1) {
         this.state.groups[group].splice(loc, 1)
       }
@@ -161,14 +157,6 @@ class PADBot {
     } catch (err) {
       console.error(err)
     }
-  }
-
-  getState(): any {
-    return this.state
-  }
-
-  setState(newState: {}): void {
-    this.state = newState
   }
 
   addCommand(command: string, handler: Handler): void {
@@ -236,6 +224,14 @@ class PADBot {
     const commandRoot = message.content.split(' ')[0]
     let handlerResult: Result
 
+    if (message.guild !== null && this.state.guilds[message.guild.id] === undefined) {
+      this.state.guilds[message.guild.id] = {
+        groups: {
+          admin: [this.discordBotOwnerTag]
+        }
+      }
+    }
+
     const handler = this.handlers.get(commandRoot)
     if (handler !== undefined) {
       for (const executor of this.preHooks) {
@@ -247,16 +243,19 @@ class PADBot {
 
       if (handler.permittedGroups.includes('any')) {
         handlerResult = await handler.executor(message, handler)
-      }
+      } else {
+        if (message.guild !== null) {
+          const groups = this.state.guilds[message.guild.id].groups
 
-      if (message.member !== null) {
-        const groups = this.getState().groups
-        for (const group in groups) {
-          for (const member of groups[group]) {
-            if (member === message.member.user.tag && handler.permittedGroups.includes(group)) {
-              handlerResult = await handler.executor(message, handler)
+          handlerResult = await (async () => {
+            for (const group in groups) {
+              for (const member of groups[group]) {
+                if (member === message.member?.user?.tag && handler.permittedGroups.includes(group)) {
+                  return await handler.executor(message, handler)
+                }
+              }
             }
-          }
+          })()
         }
       }
 
@@ -283,7 +282,7 @@ class PADBot {
       const user = cmdAndArgs[1]
       const group = cmdAndArgs[2]
 
-      this.addUser(user, group)
+      this.addUser(message.guild?.id, user, group)
 
       return await message.channel.send(`Added ${user} to ${group}`)
     }
@@ -297,7 +296,7 @@ class PADBot {
       const user = cmdAndArgs[1]
       const group = cmdAndArgs[2]
 
-      this.removeUser(user, group)
+      this.removeUser(message.guild?.id, user, group)
 
       return await message.channel.send(`Removed ${user} from ${group}`)
     }
@@ -306,7 +305,11 @@ class PADBot {
   }
 
   async handleListGroups(message: Message, handler: Handler): PromiseResult {
-    const groups = this.getState().groups
+    if (message.guild === null) {
+      return
+    }
+
+    const groups = this.state.guilds[message.guild?.id].groups
 
     return await message.channel.send({
       embed: {
@@ -322,37 +325,39 @@ class PADBot {
   }
 
   async handleJoin(message: Message, handler: Handler): PromiseResult {
-    if (message.guild == null) {
+    if (message.guild === null) {
       return
     }
 
-    if (message.member == null || (message.member.voice.channel == null)) {
+    if (message.member === null || (message.member.voice.channel === null)) {
       return await message.channel.send('You need to join a voice channel first!')
     }
 
     const connection = await message.member.voice.channel.join()
     await connection.voice?.setSelfDeaf(true)
 
-    this.startPCMStream(connection)
+    if (this.autoStartPCM) {
+      this.startPCMStream(connection)
+    }
 
     return await message.channel.send('Joined channel.')
   }
 
   async handleLeave(message: Message, handler: Handler): PromiseResult {
-    if (message.guild == null) {
+    if (message.guild === null) {
       return
     }
 
-    message.guild?.voice?.channel?.leave()
+    message.guild.voice?.channel?.leave()
     return await message.channel.send('Left channel.')
   }
 
   async handleVolume(message: Message, handler: Handler): PromiseResult {
-    if (message.guild == null) {
+    if (message.guild === null) {
       return
     }
 
-    if (message.member == null || (message.member.voice.channel == null) || message.guild?.voice?.connection == null) {
+    if (message.member?.voice?.channel === null || message.guild?.voice?.connection === null || message.guild?.voice?.connection === undefined) {
       return await message.channel.send('You need to join a voice channel first!')
     }
 
@@ -414,7 +419,7 @@ class PADBot {
   }
 
   async handleJoinURL(message: Message, handler: Handler): PromiseResult {
-    if (message.guild == null) {
+    if (message.guild === null) {
       return
     }
 
