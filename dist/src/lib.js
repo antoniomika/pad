@@ -132,10 +132,10 @@ class PADBot {
     }
     addCommand(command, handler) {
         handler.executor.bind(this);
-        this.handlers.set(command, handler);
+        this.handlers.set(`${this.commandFlag}${command}`, handler);
     }
     removeCommand(command) {
-        this.handlers.delete(command);
+        this.handlers.delete(`${this.commandFlag}${command}`);
     }
     async handleHelp(message, handler) {
         const fields = [
