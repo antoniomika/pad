@@ -127,18 +127,26 @@ class PADBot {
   }
 
   addUser(guildId: Snowflake | undefined, user: string, group: string): void {
-    if (guildId !== undefined && this.state.guilds[guildId].groups[group] === undefined) {
+    if (guildId === undefined) {
+      return
+    }
+
+    if (this.state.guilds[guildId].groups[group] === undefined) {
       this.state.guilds[guildId].groups[group] = []
     }
 
-    this.state.groups[group].push(user)
+    this.state.guilds[guildId].groups[group].push(user)
   }
 
   removeUser(guildId: Snowflake | undefined, user: string, group: string): void {
-    if (guildId !== undefined && this.state.guilds[guildId].groups[group] !== undefined) {
+    if (guildId === undefined) {
+      return
+    }
+
+    if (this.state.guilds[guildId].groups[group] !== undefined) {
       const loc = this.state.guilds[guildId].groups[group].indexOf(user)
       if (loc > -1) {
-        this.state.groups[group].splice(loc, 1)
+        this.state.guilds[guildId].groups[group].splice(loc, 1)
       }
     }
   }
