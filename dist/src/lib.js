@@ -114,7 +114,7 @@ class PADBot {
     }
     loadState() {
         try {
-            this.state = JSON.parse(fs_1.readFileSync('.pad.state').toString());
+            this.state = JSON.parse((0, fs_1.readFileSync)('.pad.state').toString());
         }
         catch (err) {
             console.error(err);
@@ -122,7 +122,7 @@ class PADBot {
     }
     saveState() {
         try {
-            fs_1.writeFileSync('.pad.state', JSON.stringify(this.state));
+            (0, fs_1.writeFileSync)('.pad.state', JSON.stringify(this.state));
         }
         catch (err) {
             console.error(err);
