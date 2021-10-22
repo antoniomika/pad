@@ -219,7 +219,7 @@ class PADBot {
       fields[2] = { name: 'Permitted Groups', value: Array.from(this.handlers.values()).map((h) => h.permittedGroups.join(', ')).join('\n'), inline: true }
     }
 
-    return message.channel.send({
+    return await message.channel.send({
       embed: {
         color: 3447003,
         title: 'Available commands:',
