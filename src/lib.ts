@@ -299,7 +299,7 @@ class PADBot {
 
     player.play(resource)
 
-    this.audioResources.set(message.guild?.id ?? '', createAudioResource(ffmpegRecord))
+    this.audioResources.set(message.guild?.id ?? '', resource)
 
     connection.subscribe(player)
   }
