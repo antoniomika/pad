@@ -1,4 +1,5 @@
-import { Client, Intents, Message, Snowflake, VoiceConnection } from 'discord.js'
+import { Client, Intents, Message, Snowflake } from 'discord.js'
+import { joinVoiceChannel, DiscordGatewayAdapterCreator, VoiceConnection, getVoiceConnection, AudioResource, getVoiceConnections, createAudioResource, createAudioPlayer, NoSubscriberBehavior, StreamType } from '@discordjs/voice'
 import { writeFileSync, readFileSync } from 'fs'
 import prism from 'prism-media'
 
@@ -27,12 +28,13 @@ class PADBot {
   client: Client
 
   handlers: Map<string, Handler>
+  audioResources: Map<Snowflake, AudioResource>
   preHooks: Executor[]
   postHooks: Executor[]
 
   state: any
 
-  constructor(discordToken: string, discordClientID: string, discordBotOwnerTag: string, ffmpegInput: string, registerExit: boolean = true, commandFlag: string = '!', autoStartPCM: boolean = true) {
+  constructor(discordToken: string, discordClientID: string, discordBotOwnerTag: string, ffmpegInput: string, registerExit: boolean = true, commandFlag: string = '', autoStartPCM: boolean = true) {
     this.discordToken = discordToken
     this.discordClientID = discordClientID
     this.discordBotOwnerTag = discordBotOwnerTag
@@ -43,13 +45,11 @@ class PADBot {
     this.autoStartPCM = autoStartPCM
 
     this.client = new Client({
-      ws: {
-        intents: [
-          Intents.FLAGS.GUILDS,
-          Intents.FLAGS.GUILD_MESSAGES,
-          Intents.FLAGS.GUILD_VOICE_STATES
-        ]
-      }
+      intents: [
+        Intents.FLAGS.GUILDS,
+        Intents.FLAGS.GUILD_MESSAGES,
+        Intents.FLAGS.GUILD_VOICE_STATES
+      ]
     })
 
     this.client.login(this.discordToken).catch(console.error)
@@ -111,6 +111,8 @@ class PADBot {
 
     this.preHooks = []
     this.postHooks = []
+
+    this.audioResources = new Map()
 
     if (this.registerExit) {
       this.registerExitHandler()
@@ -220,11 +222,11 @@ class PADBot {
     }
 
     return await message.channel.send({
-      embed: {
+      embeds: [{
         color: 3447003,
         title: 'Available commands:',
         fields: fields
-      }
+      }]
     })
   }
 
@@ -275,13 +277,31 @@ class PADBot {
     }
   }
 
-  startPCMStream(connection: VoiceConnection): any {
+  startPCMStream(message: Message, connection: VoiceConnection): void {
     const ffmpegRecord = new prism.FFmpeg({
       args: this.ffmpegInput.split(' ').concat(['-analyzeduration', '0', '-loglevel', '0', '-f', 's16le', '-ar', '48000', '-ac', '2'])
     })
 
-    // @ts-expect-error;
-    return connection.player.playPCMStream(ffmpegRecord, { type: 'converted' }, { ffmpeg: ffmpegRecord })
+    const player = createAudioPlayer({
+      behaviors: {
+        noSubscriber: NoSubscriberBehavior.Pause
+      }
+    })
+
+    const resource = createAudioResource(ffmpegRecord, {
+      inputType: StreamType.Raw,
+      inlineVolume: true,
+      metadata: {
+        guild: message.guild?.id,
+        foo: 'bar'
+      }
+    })
+
+    player.play(resource)
+
+    this.audioResources.set(message.guild?.id ?? '', createAudioResource(ffmpegRecord))
+
+    connection.subscribe(player)
   }
 
   async handleAddUser(message: Message, handler: Handler): PromiseResult {
@@ -320,7 +340,7 @@ class PADBot {
     const groups = this.state.guilds[message.guild?.id].groups
 
     return await message.channel.send({
-      embed: {
+      embeds: [{
         color: 3447003,
         title: 'Groups:',
         fields: [
@@ -328,7 +348,7 @@ class PADBot {
           // @ts-expect-error;
           { name: 'Members', value: Object.values(groups).map(g => g.join(', ')).join('\n'), inline: true }
         ]
-      }
+      }]
     })
   }
 
@@ -338,17 +358,22 @@ class PADBot {
     }
 
     if (message.member === null || (message.member.voice.channel === null)) {
-      return await message.channel.send('You need to join a voice channel first!')
+      return await message.channel.send('You need to join a voice channel first')
     }
 
-    const connection = await message.member.voice.channel.join()
-    await connection.voice?.setSelfDeaf(true)
+    const connection = joinVoiceChannel({
+      channelId: message.member.voice.channel.id,
+      guildId: message.member.voice.channel.guild.id,
+      adapterCreator: message.guild.voiceAdapterCreator as DiscordGatewayAdapterCreator
+    })
+
+    await message.guild.me?.voice?.setDeaf(true)
 
     if (this.autoStartPCM) {
-      this.startPCMStream(connection)
+      this.startPCMStream(message, connection)
     }
 
-    return await message.channel.send('Joined channel.')
+    return await message.channel.send('Joined channel')
   }
 
   async handleLeave(message: Message, handler: Handler): PromiseResult {
@@ -356,8 +381,15 @@ class PADBot {
       return
     }
 
-    message.guild.voice?.channel?.leave()
-    return await message.channel.send('Left channel.')
+    const connection = getVoiceConnection(message.guild.id)
+
+    if (message.member?.voice?.channel === null || connection === undefined) {
+      return await message.channel.send('You need to join a voice channel first')
+    }
+
+    connection.destroy()
+
+    return await message.channel.send('Left channel')
   }
 
   async handleVolume(message: Message, handler: Handler): PromiseResult {
@@ -365,11 +397,19 @@ class PADBot {
       return
     }
 
-    if (message.member?.voice?.channel === null || message.guild?.voice?.connection === null || message.guild?.voice?.connection === undefined) {
-      return await message.channel.send('You need to join a voice channel first!')
+    const connection = getVoiceConnection(message.guild.id)
+
+    if (message.member?.voice?.channel === null || connection === undefined) {
+      return await message.channel.send('You need to join a voice channel first')
     }
 
-    let volume = message.guild.voice.connection.dispatcher.volumeLogarithmic
+    const currentPlayback = this.audioResources.get(message.guild.id)
+
+    if (currentPlayback === undefined) {
+      return await message.channel.send('Nothing is currently playing')
+    }
+
+    let volume = currentPlayback.volume?.volume ?? 1
 
     const cmdAndArgs = message.content.split(' ')
     if (cmdAndArgs.length === 1) {
@@ -418,11 +458,11 @@ class PADBot {
         volume = 0
       }
 
-      message.guild?.voice?.connection?.dispatcher?.setVolumeLogarithmic(volume / 100)
+      currentPlayback.volume?.setVolumeLogarithmic(volume / 100)
       return await message.channel.send(`Volume set to ${volume}.`)
     } catch (e) {
       console.error(e)
-      return await message.channel.send('An error occurred while changing the volume.')
+      return await message.channel.send('An error occurred while changing the volume')
     }
   }
 
@@ -440,8 +480,12 @@ class PADBot {
   }
 
   destroy(): void {
-    this.client.voice?.connections.each((conn) => {
-      conn.channel.leave()
+    getVoiceConnections().forEach((conn) => {
+      conn.destroy()
+    })
+
+    this.audioResources.forEach((resource) => {
+      resource.audioPlayer?.stop()
     })
 
     this.client.destroy()

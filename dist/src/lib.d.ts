@@ -1,4 +1,5 @@
-import { Client, Message, Snowflake, VoiceConnection } from 'discord.js';
+import { Client, Message, Snowflake } from 'discord.js';
+import { VoiceConnection, AudioResource } from '@discordjs/voice';
 declare type Result = Message | undefined | boolean | null;
 declare type PromiseResult = Promise<Result>;
 declare type Executor = (message: Message, handler: Handler) => PromiseResult;
@@ -18,6 +19,7 @@ declare class PADBot {
     autoStartPCM: boolean;
     client: Client;
     handlers: Map<string, Handler>;
+    audioResources: Map<Snowflake, AudioResource>;
     preHooks: Executor[];
     postHooks: Executor[];
     state: any;
@@ -34,7 +36,7 @@ declare class PADBot {
     removeCommand(command: string): void;
     handleHelp(message: Message, handler: Handler): PromiseResult;
     handleCommand(message: Message): PromiseResult;
-    startPCMStream(connection: VoiceConnection): any;
+    startPCMStream(message: Message, connection: VoiceConnection): void;
     handleAddUser(message: Message, handler: Handler): PromiseResult;
     handleRemoveUser(message: Message, handler: Handler): PromiseResult;
     handleListGroups(message: Message, handler: Handler): PromiseResult;

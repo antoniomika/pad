@@ -5,10 +5,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PADBot = void 0;
 const discord_js_1 = require("discord.js");
+const voice_1 = require("@discordjs/voice");
 const fs_1 = require("fs");
 const prism_media_1 = __importDefault(require("prism-media"));
 class PADBot {
-    constructor(discordToken, discordClientID, discordBotOwnerTag, ffmpegInput, registerExit = true, commandFlag = '!', autoStartPCM = true) {
+    constructor(discordToken, discordClientID, discordBotOwnerTag, ffmpegInput, registerExit = true, commandFlag = '', autoStartPCM = true) {
         this.discordToken = discordToken;
         this.discordClientID = discordClientID;
         this.discordBotOwnerTag = discordBotOwnerTag;
@@ -17,13 +18,11 @@ class PADBot {
         this.commandFlag = commandFlag;
         this.autoStartPCM = autoStartPCM;
         this.client = new discord_js_1.Client({
-            ws: {
-                intents: [
-                    discord_js_1.Intents.FLAGS.GUILDS,
-                    discord_js_1.Intents.FLAGS.GUILD_MESSAGES,
-                    discord_js_1.Intents.FLAGS.GUILD_VOICE_STATES
-                ]
-            }
+            intents: [
+                discord_js_1.Intents.FLAGS.GUILDS,
+                discord_js_1.Intents.FLAGS.GUILD_MESSAGES,
+                discord_js_1.Intents.FLAGS.GUILD_VOICE_STATES
+            ]
         });
         this.client.login(this.discordToken).catch(console.error);
         this.client.on('message', (message) => {
@@ -81,6 +80,7 @@ class PADBot {
         ]);
         this.preHooks = [];
         this.postHooks = [];
+        this.audioResources = new Map();
         if (this.registerExit) {
             this.registerExitHandler();
         }
@@ -171,11 +171,11 @@ class PADBot {
             fields[2] = { name: 'Permitted Groups', value: Array.from(this.handlers.values()).map((h) => h.permittedGroups.join(', ')).join('\n'), inline: true };
         }
         return await message.channel.send({
-            embed: {
-                color: 3447003,
-                title: 'Available commands:',
-                fields: fields
-            }
+            embeds: [{
+                    color: 3447003,
+                    title: 'Available commands:',
+                    fields: fields
+                }]
         });
     }
     async handleCommand(message) {
@@ -219,12 +219,26 @@ class PADBot {
             return handlerResult;
         }
     }
-    startPCMStream(connection) {
+    startPCMStream(message, connection) {
         const ffmpegRecord = new prism_media_1.default.FFmpeg({
             args: this.ffmpegInput.split(' ').concat(['-analyzeduration', '0', '-loglevel', '0', '-f', 's16le', '-ar', '48000', '-ac', '2'])
         });
-        // @ts-expect-error;
-        return connection.player.playPCMStream(ffmpegRecord, { type: 'converted' }, { ffmpeg: ffmpegRecord });
+        const player = (0, voice_1.createAudioPlayer)({
+            behaviors: {
+                noSubscriber: voice_1.NoSubscriberBehavior.Pause
+            }
+        });
+        const resource = (0, voice_1.createAudioResource)(ffmpegRecord, {
+            inputType: voice_1.StreamType.Raw,
+            inlineVolume: true,
+            metadata: {
+                guild: message.guild?.id,
+                foo: 'bar'
+            }
+        });
+        player.play(resource);
+        this.audioResources.set(message.guild?.id ?? '', (0, voice_1.createAudioResource)(ffmpegRecord));
+        connection.subscribe(player);
     }
     async handleAddUser(message, handler) {
         const cmdAndArgs = message.content.split(' ');
@@ -252,15 +266,15 @@ class PADBot {
         }
         const groups = this.state.guilds[message.guild?.id].groups;
         return await message.channel.send({
-            embed: {
-                color: 3447003,
-                title: 'Groups:',
-                fields: [
-                    { name: 'Group', value: Object.keys(groups).join('\n'), inline: true },
-                    // @ts-expect-error;
-                    { name: 'Members', value: Object.values(groups).map(g => g.join(', ')).join('\n'), inline: true }
-                ]
-            }
+            embeds: [{
+                    color: 3447003,
+                    title: 'Groups:',
+                    fields: [
+                        { name: 'Group', value: Object.keys(groups).join('\n'), inline: true },
+                        // @ts-expect-error;
+                        { name: 'Members', value: Object.values(groups).map(g => g.join(', ')).join('\n'), inline: true }
+                    ]
+                }]
         });
     }
     async handleJoin(message, handler) {
@@ -268,30 +282,43 @@ class PADBot {
             return;
         }
         if (message.member === null || (message.member.voice.channel === null)) {
-            return await message.channel.send('You need to join a voice channel first!');
+            return await message.channel.send('You need to join a voice channel first');
         }
-        const connection = await message.member.voice.channel.join();
-        await connection.voice?.setSelfDeaf(true);
+        const connection = (0, voice_1.joinVoiceChannel)({
+            channelId: message.member.voice.channel.id,
+            guildId: message.member.voice.channel.guild.id,
+            adapterCreator: message.guild.voiceAdapterCreator
+        });
+        await message.guild.me?.voice?.setDeaf(true);
         if (this.autoStartPCM) {
-            this.startPCMStream(connection);
+            this.startPCMStream(message, connection);
         }
-        return await message.channel.send('Joined channel.');
+        return await message.channel.send('Joined channel');
     }
     async handleLeave(message, handler) {
         if (message.guild === null) {
             return;
         }
-        message.guild.voice?.channel?.leave();
-        return await message.channel.send('Left channel.');
+        const connection = (0, voice_1.getVoiceConnection)(message.guild.id);
+        if (message.member?.voice?.channel === null || connection === undefined) {
+            return await message.channel.send('You need to join a voice channel first');
+        }
+        connection.destroy();
+        return await message.channel.send('Left channel');
     }
     async handleVolume(message, handler) {
         if (message.guild === null) {
             return;
         }
-        if (message.member?.voice?.channel === null || message.guild?.voice?.connection === null || message.guild?.voice?.connection === undefined) {
-            return await message.channel.send('You need to join a voice channel first!');
+        const connection = (0, voice_1.getVoiceConnection)(message.guild.id);
+        if (message.member?.voice?.channel === null || connection === undefined) {
+            return await message.channel.send('You need to join a voice channel first');
         }
-        let volume = message.guild.voice.connection.dispatcher.volumeLogarithmic;
+        const currentPlayback = this.audioResources.get(message.guild.id);
+        if (currentPlayback === undefined) {
+            return await message.channel.send('Nothing is currently playing');
+        }
+        let volume = currentPlayback.volume?.volume ?? 1;
         const cmdAndArgs = message.content.split(' ');
         if (cmdAndArgs.length === 1) {
             return await message.channel.send(`Current volume is ${volume * 100}.`);
@@ -334,12 +361,12 @@ class PADBot {
             if (volume < 0) {
                 volume = 0;
             }
-            message.guild?.voice?.connection?.dispatcher?.setVolumeLogarithmic(volume / 100);
+            currentPlayback.volume?.setVolumeLogarithmic(volume / 100);
             return await message.channel.send(`Volume set to ${volume}.`);
         }
         catch (e) {
             console.error(e);
-            return await message.channel.send('An error occurred while changing the volume.');
+            return await message.channel.send('An error occurred while changing the volume');
         }
     }
     async handleJoinURL(message, handler) {
@@ -353,8 +380,11 @@ class PADBot {
         process.on('SIGTERM', this.destroy.bind(this));
     }
     destroy() {
-        this.client.voice?.connections.each((conn) => {
-            conn.channel.leave();
+        (0, voice_1.getVoiceConnections)().forEach((conn) => {
+            conn.destroy();
+        });
+        this.audioResources.forEach((resource) => {
+            resource.audioPlayer?.stop();
         });
         this.client.destroy();
         this.saveState();
