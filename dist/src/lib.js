@@ -53,8 +53,8 @@ class PADBot {
                     example: `${this.commandFlag}joinurl`,
                     permittedGroups: ['admin']
                 }],
-            [`${this.commandFlag}listgroups`, {
-                    executor: this.handleListGroups.bind(this),
+            [`${this.commandFlag}groups`, {
+                    executor: this.handleGroups.bind(this),
                     help: 'Prints the groups in the state',
                     example: `${this.commandFlag}listgroups`,
                     permittedGroups: ['admin']
@@ -219,7 +219,7 @@ class PADBot {
             return handlerResult;
         }
     }
-    startPCMStream(message, connection) {
+    startPCMStream(message, connection, extra = {}) {
         const ffmpegRecord = new prism_media_1.default.FFmpeg({
             args: this.ffmpegInput.split(' ').concat(['-analyzeduration', '0', '-loglevel', '0', '-f', 's16le', '-ar', '48000', '-ac', '2'])
         });
@@ -232,8 +232,8 @@ class PADBot {
             inputType: voice_1.StreamType.Raw,
             inlineVolume: true,
             metadata: {
-                guild: message.guild?.id,
-                foo: 'bar'
+                ...extra,
+                guild: message.guild?.id
             }
         });
         player.play(resource);
@@ -261,7 +261,7 @@ class PADBot {
         }
         return await message.channel.send(handler.example);
     }
-    async handleListGroups(message, handler) {
+    async handleGroups(message, handler) {
         if (message.guild === null) {
             return;
         }

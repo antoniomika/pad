@@ -36,10 +36,10 @@ declare class PADBot {
     removeCommand(command: string): void;
     handleHelp(message: Message, handler: Handler): PromiseResult;
     handleCommand(message: Message): PromiseResult;
-    startPCMStream(message: Message, connection: VoiceConnection): AudioResource;
+    startPCMStream(message: Message, connection: VoiceConnection, extra?: object): AudioResource;
     handleAddUser(message: Message, handler: Handler): PromiseResult;
     handleRemoveUser(message: Message, handler: Handler): PromiseResult;
-    handleListGroups(message: Message, handler: Handler): PromiseResult;
+    handleGroups(message: Message, handler: Handler): PromiseResult;
     handleJoin(message: Message, handler: Handler): PromiseResult;
     handleLeave(message: Message, handler: Handler): PromiseResult;
     handleVolume(message: Message, handler: Handler): PromiseResult;
