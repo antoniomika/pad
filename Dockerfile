@@ -12,7 +12,7 @@ WORKDIR /usr/src/app
 RUN apk add --no-cache build-base libtool autoconf automake python3 ffmpeg alsa-plugins-pulse
 
 COPY package*.json ./
-RUN npm ci --no-optional
+RUN npm install
 
 COPY . .
 RUN npm run build
