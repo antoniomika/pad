@@ -277,7 +277,7 @@ class PADBot {
     }
   }
 
-  startPCMStream(message: Message, connection: VoiceConnection): void {
+  startPCMStream(message: Message, connection: VoiceConnection): AudioResource {
     const ffmpegRecord = new prism.FFmpeg({
       args: this.ffmpegInput.split(' ').concat(['-analyzeduration', '0', '-loglevel', '0', '-f', 's16le', '-ar', '48000', '-ac', '2'])
     })
@@ -302,6 +302,8 @@ class PADBot {
     this.audioResources.set(message.guild?.id ?? '', resource)
 
     connection.subscribe(player)
+
+    return resource
   }
 
   async handleAddUser(message: Message, handler: Handler): PromiseResult {

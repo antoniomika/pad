@@ -237,8 +237,9 @@ class PADBot {
             }
         });
         player.play(resource);
-        this.audioResources.set(message.guild?.id ?? '', (0, voice_1.createAudioResource)(ffmpegRecord));
+        this.audioResources.set(message.guild?.id ?? '', resource);
         connection.subscribe(player);
+        return resource;
     }
     async handleAddUser(message, handler) {
         const cmdAndArgs = message.content.split(' ');
