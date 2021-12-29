@@ -9,7 +9,7 @@ ENV FFMPEG_INPUT=""
 
 WORKDIR /usr/src/app
 
-RUN apk add --no-cache build-base python3 ffmpeg alsa-plugins-pulse
+RUN apk add --no-cache build-base libsodium python3 ffmpeg alsa-plugins-pulse
 
 COPY package*.json ./
 RUN npm ci --no-optional

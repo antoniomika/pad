@@ -288,9 +288,9 @@ class PADBot {
         const connection = (0, voice_1.joinVoiceChannel)({
             channelId: message.member.voice.channel.id,
             guildId: message.member.voice.channel.guild.id,
-            adapterCreator: message.guild.voiceAdapterCreator
+            adapterCreator: message.guild.voiceAdapterCreator,
+            selfDeaf: true
         });
-        await message.guild.me?.voice?.setDeaf(true);
         if (this.autoStartPCM) {
             this.startPCMStream(message, connection);
         }
