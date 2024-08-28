@@ -9,7 +9,8 @@
     "start": "node ./dist/bin/padbot.js",
     "dev": "npm run build && npm run start",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "lint": "eslint . --ext .js,.jsx,.ts,.tsx --ignore-pattern dist/"
+    "lint": "eslint . --ignore-pattern dist/ && prettier . --check",
+    "format": "prettier . --write"
   },
   "repository": {
     "type": "git",
@@ -21,20 +22,23 @@
   },
   "homepage": "https://github.com/antoniomika/pad#readme",
   "devDependencies": {
-    "@types/node": "^17.0.5",
-    "@typescript-eslint/eslint-plugin": "^5.8.1",
-    "eslint": "^8.5.0",
-    "eslint-config-standard-with-typescript": "^20.0.0",
-    "eslint-plugin-import": "^2.25.3",
+    "@eslint/js": "^9.9.1",
+    "@types/eslint__js": "^8.42.3",
+    "@types/node": "^22.5.0",
+    "eslint": "^8.57.0",
+    "eslint-config-love": "^63.0.0",
+    "eslint-plugin-import": "^2.29.1",
     "eslint-plugin-node": "^11.1.0",
-    "eslint-plugin-promise": "^6.0.0",
-    "typescript": "^4.5.4"
+    "eslint-plugin-promise": "^7.1.0",
+    "prettier": "3.3.3",
+    "typescript": "^5.5.4",
+    "typescript-eslint": "^8.3.0"
   },
   "dependencies": {
-    "@discordjs/opus": "^0.7.0",
-    "@discordjs/voice": "^0.7.5",
-    "discord.js": "^13.4.0",
-    "prism-media": "^1.3.2",
+    "@discordjs/opus": "^0.9.0",
+    "@discordjs/voice": "^0.17.0",
+    "discord.js": "^14.15.3",
+    "prism-media": "^1.3.5",
     "sodium": "^3.0.2"
   }
 }

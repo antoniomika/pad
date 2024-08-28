@@ -1,8 +1,8 @@
-import { Client, Message, Snowflake } from 'discord.js';
-import { VoiceConnection, AudioResource } from '@discordjs/voice';
-declare type Result = Message | undefined | boolean | null;
-declare type PromiseResult = Promise<Result>;
-declare type Executor = (message: Message, handler: Handler) => PromiseResult;
+import { Client, Message, Snowflake } from "discord.js";
+import { VoiceConnection, AudioResource } from "@discordjs/voice";
+type Result = Message | undefined | boolean | null;
+type PromiseResult = Promise<Result>;
+type Executor = (message: Message, handler: Handler) => PromiseResult;
 interface Handler {
     executor: Executor;
     help: string;

@@ -1,5 +1,4 @@
-# syntax = docker/dockerfile:experimental
-FROM --platform=$TARGETPLATFORM node:alpine as builder
+FROM --platform=$TARGETPLATFORM node:22-alpine as builder
 LABEL maintainer="Antonio Mika <me@antoniomika.me>"
 
 ENV DISCORD_TOKEN=""
