@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { Client, GatewayIntentBits, Message, Snowflake } from "discord.js";
+import { Client, GatewayIntentBits, Message, Snowflake, Events } from "discord.js";
 import {
   joinVoiceChannel,
   DiscordGatewayAdapterCreator,
@@ -75,7 +75,7 @@ class PADBot {
 
     this.client.login(this.discordToken).catch(console.error);
 
-    this.client.on("message", (message) => {
+    this.client.on(Events.MessageCreate, (message) => {
       this.handleCommand(message).catch(console.error);
     });
 

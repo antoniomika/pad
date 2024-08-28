@@ -26,7 +26,7 @@ class PADBot {
             ],
         });
         this.client.login(this.discordToken).catch(console.error);
-        this.client.on("message", (message) => {
+        this.client.on(discord_js_1.Events.MessageCreate, (message) => {
             this.handleCommand(message).catch(console.error);
         });
         this.handlers = new Map([
