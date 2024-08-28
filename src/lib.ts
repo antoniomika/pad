@@ -70,6 +70,7 @@ class PADBot {
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.GuildVoiceStates,
+        GatewayIntentBits.MessageContent,
       ],
     });
 
