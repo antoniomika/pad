@@ -23,6 +23,7 @@ class PADBot {
                 discord_js_1.GatewayIntentBits.Guilds,
                 discord_js_1.GatewayIntentBits.GuildMessages,
                 discord_js_1.GatewayIntentBits.GuildVoiceStates,
+                discord_js_1.GatewayIntentBits.MessageContent,
             ],
         });
         this.client.login(this.discordToken).catch(console.error);
